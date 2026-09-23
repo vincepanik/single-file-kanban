@@ -1,6 +1,6 @@
 # Single File Kanban
 
-A personal kanban board that lives in **one 374 KB HTML file**. No account, no server, no build step, no network requests. Download it, double click it, use it.
+A personal kanban board that lives in **one 378 KB HTML file**. No account, no server, no build step, no network requests. Download it, double click it, use it.
 
 **[Try the live demo](https://vincepanik.github.io/single-file-kanban/)** or **[download the file](https://github.com/vincepanik/single-file-kanban/raw/main/index.html)** and run it from your own machine.
 
@@ -26,10 +26,11 @@ Most task boards want an account, a subscription, and a copy of your data on som
 - Tag filtering and search
 - Export and import as JSON, so your data is portable
 - A weekly automatic JSON backup offered as a download
+- English and French interface, following your browser, switchable from the header
 
 ## Privacy, in concrete terms
 
-This file makes **zero network requests**. Not one. No `fetch`, no `XMLHttpRequest`, no WebSocket, no beacon, no analytics, no remote font. React and the Inter typeface are bundled inside the file, which is why it is 374 KB and why it works on a plane.
+This file makes **zero network requests**. Not one. No `fetch`, no `XMLHttpRequest`, no WebSocket, no beacon, no analytics, no remote font. React and the Inter typeface are bundled inside the file, which is why it is 378 KB and why it works on a plane.
 
 Your cards live in your browser's `localStorage`, on your machine only. Nothing is sent anywhere, to anyone, including me. You do not have to take my word for it: open your browser's network tab and watch nothing happen.
 
@@ -62,6 +63,8 @@ MIT, see [LICENSE](LICENSE). Use it, change it, sell it, no attribution required
 
 Bundled components: React and React DOM (MIT, Copyright Meta Platforms, Inc.) and the Inter typeface (SIL Open Font License 1.1, Copyright 2016 The Inter Project Authors).
 
-## A note on the interface language
+## Languages
 
-The interface is currently in French. The code is in `src/app.jsx` and all the strings are inline, so translating it is a find and replace away. Pull requests welcome.
+The interface ships in English and French. It follows your browser's language on first visit, and the FR/EN button in the header switches it at any time. Your own content is never touched by a language switch: cards, renamed columns, tags and notes are yours and stay exactly as you wrote them.
+
+Adding a language means adding one entry to the `STR` dictionary at the top of `src/app.jsx`. Pull requests welcome.

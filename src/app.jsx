@@ -2,31 +2,134 @@ import { useState, useRef, useEffect } from "react";
 
 const COL_COLORS = ["#94A3B8","#E8C547","#E87B47","#E84770","#A347E8","#4770E8","#47C5E8","#47E87B"];
 const CARD_COLORS = ["#E8C547","#E87B47","#E84770","#A347E8","#4770E8","#47C5E8","#47E87B","#E84747","#F08080","#90EE90"];
+// Valeurs internes des priorités : STOCKÉES dans les cartes, jamais traduites.
+// Seul leur libellé d'affichage change de langue (STR[lang].prio).
 const PRIORITIES = ["haute","normale","basse"];
 const PRIORITY_COLORS = { haute:"#E84770", normale:"#E8C547", basse:"#94A3B8" };
-const DEFAULT_TAGS = ["Travail","Perso","Client","Tech","Design","Admin","Apprentissage","Idée"];
 
-const DEFAULT_COLUMNS = [
-  { id:"idee", title:"Idée", color:"#94A3B8", cards:[
-    { id:"c1", title:"Refaire le site perso", tag:"Perso", color:"#A347E8", priority:"basse", notes:"Exemple de carte. Clique dessus pour la modifier ou la supprimer." },
-    { id:"c2", title:"Apprendre un nouvel outil", tag:"Apprentissage", color:"#47C5E8", priority:"normale", notes:"" },
-  ]},
-  { id:"todo", title:"À faire", color:"#E8C547", cards:[
-    { id:"c3", title:"Préparer la réunion de lundi", tag:"Travail", color:"#E8C547", priority:"haute", notes:"Ajoute une échéance pour voir le badge de rappel." },
-    { id:"c4", title:"Trier les papiers administratifs", tag:"Admin", color:"#E84747", priority:"basse", notes:"" },
-  ]},
-  { id:"encours", title:"En cours", color:"#E87B47", cards:[
-    { id:"c5", title:"Maquette du nouveau logo", tag:"Design", color:"#E87B47", priority:"haute", notes:"" },
-    { id:"c6", title:"Devis client", tag:"Client", color:"#47E87B", priority:"normale", notes:"" },
-  ]},
-  { id:"attente", title:"En attente", color:"#A347E8", cards:[
-    { id:"c7", title:"Retour du client sur la V1", tag:"Client", color:"#4770E8", priority:"normale", notes:"" },
-  ]},
-  { id:"termine", title:"Terminé", color:"#47E87B", cards:[
-    { id:"c8", title:"Sauvegarde des fichiers", tag:"Tech", color:"#47C5E8", priority:"normale", notes:"" },
-    { id:"c9", title:"Inscription à la newsletter", tag:"Perso", color:"#47E87B", priority:"basse", notes:"" },
-  ]},
-];
+// ── Internationalisation ─────────────────────────────────────────────────
+// Seuls les textes de l'interface sont traduits. Le contenu saisi par
+// l'utilisateur (titres de cartes, colonnes renommées, tags, notes) lui
+// appartient et n'est jamais réécrit lors d'un changement de langue.
+const STR = {
+  fr: {
+    docTitle:"Mon Organisateur — kanban local",
+    appTitle:"Mes Projets", countOne:"projet", countMany:"projets", saved:"Sauvegardé",
+    searchPh:"Rechercher…",
+    export:"Exporter", exportTitle:"Télécharger une sauvegarde JSON",
+    import:"Importer", importTitle:"Restaurer depuis une sauvegarde JSON",
+    langTitle:"Switch to English",
+    renameCol:"Cliquer pour renommer", deleteColTitle:"Supprimer la colonne",
+    hasNotes:"Contient des notes", addCard:"+ Ajouter un projet", newCol:"Nouvelle colonne",
+    newCard:"Nouveau projet", editCard:"Modifier le projet",
+    tabInfos:"Infos", tabNotes:"Notes",
+    fTitle:"Titre", fTitlePh:"Nom du projet…",
+    fType:"Type", newTagPh:"Nouveau type…", createTag:"+ Créer",
+    fPriority:"Priorité", fDeadline:"Échéance", clear:"Effacer", fColor:"Couleur",
+    freeNotes:"Notes libres", notesPh:"Idées, contacts, liens, prochaines étapes…",
+    notesHint:"Point bleu • sur la carte = notes présentes",
+    delete:"Supprimer", cancel:"Annuler", add:"Ajouter", save:"Sauvegarder",
+    colName:"Nom", colNamePh:"Ex: En attente, Archivé…", create:"Créer",
+    delColQ:"Supprimer la colonne ?",
+    delColBody:"Tous les projets dans cette colonne seront supprimés. Cette action est irréversible.",
+    delCardQ:"Supprimer ce projet ?",
+    delCardBody:(title) => "\u00ab " + title + " \u00bb et ses notes seront supprimés définitivement.",
+    autoBackup:"Sauvegarde auto téléchargée, garde ce fichier au chaud",
+    importErr:"Fichier invalide, utilise un fichier exporté depuis cette appli.",
+    dlOver:"Échéance dépassée", dlLabel:"Échéance",
+    dlIn:(d) => "Échéance dans " + d + " jour" + (d > 1 ? "s" : ""),
+    prio:{ haute:"haute", normale:"normale", basse:"basse" },
+    locale:"fr-FR",
+  },
+  en: {
+    docTitle:"Single File Kanban",
+    appTitle:"My Board", countOne:"card", countMany:"cards", saved:"Saved",
+    searchPh:"Search…",
+    export:"Export", exportTitle:"Download a JSON backup",
+    import:"Import", importTitle:"Restore from a JSON backup",
+    langTitle:"Passer en français",
+    renameCol:"Click to rename", deleteColTitle:"Delete column",
+    hasNotes:"Has notes", addCard:"+ Add a card", newCol:"New column",
+    newCard:"New card", editCard:"Edit card",
+    tabInfos:"Info", tabNotes:"Notes",
+    fTitle:"Title", fTitlePh:"Card name…",
+    fType:"Tag", newTagPh:"New tag…", createTag:"+ Create",
+    fPriority:"Priority", fDeadline:"Deadline", clear:"Clear", fColor:"Color",
+    freeNotes:"Notes", notesPh:"Ideas, contacts, links, next steps…",
+    notesHint:"A blue dot • on a card means it has notes",
+    delete:"Delete", cancel:"Cancel", add:"Add", save:"Save",
+    colName:"Name", colNamePh:"e.g. Waiting, Archived…", create:"Create",
+    delColQ:"Delete this column?",
+    delColBody:"Every card in this column will be deleted. This cannot be undone.",
+    delCardQ:"Delete this card?",
+    delCardBody:(title) => "\u201c" + title + "\u201d and its notes will be permanently deleted.",
+    autoBackup:"Automatic backup downloaded, keep that file somewhere safe",
+    importErr:"Invalid file, use a file exported from this app.",
+    dlOver:"Overdue", dlLabel:"Deadline",
+    dlIn:(d) => "Due in " + d + " day" + (d > 1 ? "s" : ""),
+    prio:{ haute:"high", normale:"normal", basse:"low" },
+    locale:"en-US",
+  },
+};
+
+// Langue retenue, sinon celle du navigateur, sinon anglais.
+function detectLang() {
+  try {
+    const saved = localStorage.getItem("organisateur_lang");
+    if (saved === "fr" || saved === "en") return saved;
+  } catch {}
+  try {
+    return String(navigator.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
+  } catch { return "en"; }
+}
+
+// Données de démonstration, semées une seule fois dans la langue détectée.
+const DEMO = {
+  fr: {
+    tags:["Travail","Perso","Client","Tech","Design","Admin","Apprentissage","Idée"],
+    cols:[
+      ["idee","Idée","#94A3B8",[
+        ["c1","Refaire le site perso","Perso","#A347E8","basse","Exemple de carte. Clique dessus pour la modifier ou la supprimer."],
+        ["c2","Apprendre un nouvel outil","Apprentissage","#47C5E8","normale",""]]],
+      ["todo","À faire","#E8C547",[
+        ["c3","Préparer la réunion de lundi","Travail","#E8C547","haute","Ajoute une échéance pour voir le badge de rappel."],
+        ["c4","Trier les papiers administratifs","Admin","#E84747","basse",""]]],
+      ["encours","En cours","#E87B47",[
+        ["c5","Maquette du nouveau logo","Design","#E87B47","haute",""],
+        ["c6","Devis client","Client","#47E87B","normale",""]]],
+      ["attente","En attente","#A347E8",[
+        ["c7","Retour du client sur la V1","Client","#4770E8","normale",""]]],
+      ["termine","Terminé","#47E87B",[
+        ["c8","Sauvegarde des fichiers","Tech","#47C5E8","normale",""],
+        ["c9","Inscription à la newsletter","Perso","#47E87B","basse",""]]],
+    ],
+  },
+  en: {
+    tags:["Work","Personal","Client","Tech","Design","Admin","Learning","Idea"],
+    cols:[
+      ["idee","Ideas","#94A3B8",[
+        ["c1","Redo my personal site","Personal","#A347E8","basse","Example card. Click it to edit or delete it."],
+        ["c2","Learn a new tool","Learning","#47C5E8","normale",""]]],
+      ["todo","To do","#E8C547",[
+        ["c3","Prep Monday's meeting","Work","#E8C547","haute","Add a deadline to see the reminder badge."],
+        ["c4","Sort out the paperwork","Admin","#E84747","basse",""]]],
+      ["encours","In progress","#E87B47",[
+        ["c5","New logo mockup","Design","#E87B47","haute",""],
+        ["c6","Client quote","Client","#47E87B","normale",""]]],
+      ["attente","Waiting","#A347E8",[
+        ["c7","Client feedback on v1","Client","#4770E8","normale",""]]],
+      ["termine","Done","#47E87B",[
+        ["c8","Back up the files","Tech","#47C5E8","normale",""],
+        ["c9","Sign up to the newsletter","Personal","#47E87B","basse",""]]],
+    ],
+  },
+};
+const defaultTags = (lang) => DEMO[lang].tags.slice();
+const defaultColumns = (lang) => DEMO[lang].cols.map(([id, title, color, cards]) => ({
+  id, title, color,
+  cards: cards.map(([cid, ctitle, tag, ccolor, priority, notes]) =>
+    ({ id:cid, title:ctitle, tag, color:ccolor, priority, notes })),
+}));
 
 function loadState(key, fallback) {
   try {
@@ -61,19 +164,19 @@ function sanitizeColumns(cols) {
 }
 
 // Infos d'affichage pour une date d'échéance (badge coloré sur la carte)
-function deadlineInfo(d) {
+function deadlineInfo(d, t) {
   if (!d) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const date = new Date(d + "T00:00:00");
   if (isNaN(date)) return null;
   const days = Math.round((date - today) / 86400000);
-  const label = date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-  if (days < 0)  return { label, color: "#E84770", title: "Échéance dépassée" };
-  if (days <= 7) return { label, color: "#E87B47", title: "Échéance dans " + days + " jour" + (days > 1 ? "s" : "") };
-  return { label, color: "#94A3B8", title: "Échéance" };
+  const label = date.toLocaleDateString(t.locale, { day: "numeric", month: "short" });
+  if (days < 0)  return { label, color: "#E84770", title: t.dlOver };
+  if (days <= 7) return { label, color: "#E87B47", title: t.dlIn(days) };
+  return { label, color: "#94A3B8", title: t.dlLabel };
 }
 
-function EditableColTitle({ title, onSave }) {
+function EditableColTitle({ title, hint, onSave }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(title);
   const inputRef = useRef(null);
@@ -92,7 +195,7 @@ function EditableColTitle({ title, onSave }) {
     />
   );
   return (
-    <span title="Cliquer pour renommer" onClick={() => setEditing(true)}
+    <span title={hint} onClick={() => setEditing(true)}
       style={{ cursor:"text", flex:1, fontSize:13, fontWeight:700, letterSpacing:"0.02em" }}>
       {title}
     </span>
@@ -100,8 +203,10 @@ function EditableColTitle({ title, onSave }) {
 }
 
 export default function KanbanApp() {
-  const [columns, setColumns] = useState(() => sanitizeColumns(loadState("organisateur_columns", DEFAULT_COLUMNS)));
-  const [tags, setTags] = useState(() => loadState("organisateur_tags", DEFAULT_TAGS));
+  const [lang, setLang] = useState(detectLang);
+  const t = STR[lang];
+  const [columns, setColumns] = useState(() => sanitizeColumns(loadState("organisateur_columns", defaultColumns(detectLang()))));
+  const [tags, setTags] = useState(() => loadState("organisateur_tags", defaultTags(detectLang())));
   const [dragging, setDragging] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [modal, setModal] = useState(null);
@@ -124,9 +229,16 @@ export default function KanbanApp() {
     localStorage.setItem("organisateur_columns", JSON.stringify(columns));
     localStorage.setItem("organisateur_tags", JSON.stringify(tags));
     setSavedFlash(true);
-    const t = setTimeout(() => setSavedFlash(false), 1400);
-    return () => clearTimeout(t);
+    const id = setTimeout(() => setSavedFlash(false), 1400);
+    return () => clearTimeout(id);
   }, [columns, tags]);
+
+  // Langue : retenue d'une visite à l'autre, et reportée sur le document
+  useEffect(() => {
+    try { localStorage.setItem("organisateur_lang", lang); } catch {}
+    document.documentElement.lang = lang;
+    document.title = STR[lang].docTitle;
+  }, [lang]);
 
   // ── Export JSON ──────────────────────────────────────────────
   const handleExport = () => {
@@ -136,7 +248,7 @@ export default function KanbanApp() {
     const a = document.createElement("a");
     const date = new Date().toISOString().slice(0,10);
     a.href = url;
-    a.download = `organisateur-sauvegarde-${date}.json`;
+    a.download = (lang === "fr" ? "organisateur-sauvegarde-" : "kanban-backup-") + date + ".json";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -147,13 +259,13 @@ export default function KanbanApp() {
     // Premiere ouverture : on amorce le compteur sans declencher de telechargement
     if (!raw) { localStorage.setItem("organisateur_last_autobackup", String(Date.now())); return; }
     if (Date.now() - Number(raw) < 7 * 24 * 3600 * 1000) return;
-    const t = setTimeout(() => {
+    const id = setTimeout(() => {
       handleExport();
       localStorage.setItem("organisateur_last_autobackup", String(Date.now()));
       setAutoBackupToast(true);
       setTimeout(() => setAutoBackupToast(false), 8000);
     }, 3000);
-    return () => clearTimeout(t);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -170,7 +282,7 @@ export default function KanbanApp() {
         if (data.tags && Array.isArray(data.tags)) setTags(data.tags);
         setImportError("");
       } catch {
-        setImportError("Fichier invalide — utilise un fichier exporté depuis cette appli.");
+        setImportError(t.importErr);
         setTimeout(() => setImportError(""), 4000);
       }
     };
@@ -208,7 +320,7 @@ export default function KanbanApp() {
     setDragging(null); setDragOver(null); setDragOverCard(null);
   };
 
-  const renameCol = (colId, t) => setColumns(cols => cols.map(col => col.id===colId ? {...col, title:t} : col));
+  const renameCol = (colId, title) => setColumns(cols => cols.map(col => col.id===colId ? {...col, title} : col));
   const deleteCol = (colId) => { setColumns(cols => cols.filter(col => col.id!==colId)); setConfirmDeleteCol(null); };
   const addColumn = () => { setColForm({ title:"", color:COL_COLORS[0] }); setColModal("add"); };
   const saveColumn = () => {
@@ -245,13 +357,13 @@ export default function KanbanApp() {
   };
 
   const addTag = () => {
-    const t = newTagInput.trim();
-    if (t && !tags.includes(t)) { setTags(prev => [...prev, t]); setForm(f => ({...f, tag:t})); }
+    const v = newTagInput.trim();
+    if (v && !tags.includes(v)) { setTags(prev => [...prev, v]); setForm(f => ({...f, tag:v})); }
     setNewTagInput("");
   };
-  const deleteTag = (t) => {
-    setTags(prev => prev.filter(x => x!==t));
-    if (form.tag===t) setForm(f => ({...f, tag:""}));
+  const deleteTag = (tag) => {
+    setTags(prev => prev.filter(x => x!==tag));
+    if (form.tag===tag) setForm(f => ({...f, tag:""}));
   };
 
   const filteredColumns = columns.map(col => ({
@@ -384,8 +496,8 @@ export default function KanbanApp() {
       }}>
         {/* Gauche */}
         <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-          <h1 style={{ fontSize:21, fontWeight:700, letterSpacing:"-0.01em" }}>Mes Projets</h1>
-          <span style={{ fontSize:12, color:"#5A5A70", fontWeight:500 }}>{totalCards} projets</span>
+          <h1 style={{ fontSize:21, fontWeight:700, letterSpacing:"-0.01em" }}>{t.appTitle}</h1>
+          <span style={{ fontSize:12, color:"#5A5A70", fontWeight:500 }}>{totalCards} {totalCards > 1 ? t.countMany : t.countOne}</span>
           <span style={{
             display:"flex", alignItems:"center", gap:5,
             fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:500,
@@ -393,28 +505,33 @@ export default function KanbanApp() {
             opacity: savedFlash ? 1 : 0
           }}>
             <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3.5" fill="#47E87B"/></svg>
-            Sauvegardé
+            {t.saved}
           </span>
         </div>
 
         {/* Droite */}
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <input className="search-input" placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)} />
+          <button className="header-btn" onClick={() => setLang(l => l === "fr" ? "en" : "fr")}
+            title={t.langTitle}
+            style={{ fontWeight:600, letterSpacing:"0.04em" }}>
+            {lang === "fr" ? "EN" : "FR"}
+          </button>
+          <input className="search-input" placeholder={t.searchPh} value={search} onChange={e => setSearch(e.target.value)} />
 
           {/* Bouton Exporter */}
-          <button className="header-btn" onClick={handleExport} title="Télécharger une sauvegarde JSON">
+          <button className="header-btn" onClick={handleExport} title={t.exportTitle}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Exporter
+            {t.export}
           </button>
 
           {/* Bouton Importer */}
-          <button className="header-btn import" onClick={() => importRef.current?.click()} title="Restaurer depuis une sauvegarde JSON">
+          <button className="header-btn import" onClick={() => importRef.current?.click()} title={t.importTitle}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M7 9V1M4 4l3-3 3 3M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Importer
+            {t.import}
           </button>
           <input ref={importRef} type="file" accept=".json" style={{ display:"none" }} onChange={handleImportFile} />
         </div>
@@ -433,9 +550,9 @@ export default function KanbanApp() {
           >
             <div style={{ padding:"13px 12px 11px", borderBottom:"1px solid #1E1E2A", display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ width:8, height:8, borderRadius:"50%", background:col.color, flexShrink:0 }} />
-              <EditableColTitle title={col.title} onSave={t => renameCol(col.id, t)} />
+              <EditableColTitle title={col.title} hint={t.renameCol} onSave={v => renameCol(col.id, v)} />
               <span style={{ fontSize:11, color:"#5A5A70", fontWeight:600, background:"#0F0F18", borderRadius:6, padding:"2px 6px", flexShrink:0 }}>{col.cards.length}</span>
-              <button className="icon-btn" title="Supprimer la colonne" onClick={() => setConfirmDeleteCol(col.id)}>✕</button>
+              <button className="icon-btn" title={t.deleteColTitle} onClick={() => setConfirmDeleteCol(col.id)}>✕</button>
             </div>
             <div style={{ padding:"10px", overflowY:"auto", flex:1 }}>
               {col.cards.map(card => (
@@ -457,26 +574,26 @@ export default function KanbanApp() {
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                     {card.tag && <span className="tag-pill">{card.tag}</span>}
-                    {deadlineInfo(card.deadline) && (
-                      <span title={deadlineInfo(card.deadline).title}
-                        style={{ fontSize:11, fontWeight:600, color:deadlineInfo(card.deadline).color, flexShrink:0 }}>
-                        ◷ {deadlineInfo(card.deadline).label}
+                    {deadlineInfo(card.deadline, t) && (
+                      <span title={deadlineInfo(card.deadline, t).title}
+                        style={{ fontSize:11, fontWeight:600, color:deadlineInfo(card.deadline, t).color, flexShrink:0 }}>
+                        ◷ {deadlineInfo(card.deadline, t).label}
                       </span>
                     )}
-                    {card.notes && <span style={{ width:6, height:6, borderRadius:"50%", background:"#4770E8", display:"inline-block", flexShrink:0 }} title="Contient des notes" />}
+                    {card.notes && <span style={{ width:6, height:6, borderRadius:"50%", background:"#4770E8", display:"inline-block", flexShrink:0 }} title={t.hasNotes} />}
                     <span style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:4 }}>
                       <span style={{ width:6, height:6, borderRadius:"50%", background:PRIORITY_COLORS[card.priority], display:"inline-block" }} />
-                      <span style={{ fontSize:11, fontWeight:500, color:PRIORITY_COLORS[card.priority] }}>{card.priority}</span>
+                      <span style={{ fontSize:11, fontWeight:500, color:PRIORITY_COLORS[card.priority] }}>{t.prio[card.priority] || card.priority}</span>
                     </span>
                   </div>
                 </div>
               ))}
-              <button className="add-card-btn" onClick={() => openAdd(col.id)}>+ Ajouter un projet</button>
+              <button className="add-card-btn" onClick={() => openAdd(col.id)}>{t.addCard}</button>
             </div>
           </div>
         ))}
         <button className="new-col-btn" onClick={addColumn}>
-          <span style={{ fontSize:16 }}>+</span><span>Nouvelle colonne</span>
+          <span style={{ fontSize:16 }}>+</span><span>{t.newCol}</span>
         </button>
       </div>
 
@@ -486,10 +603,10 @@ export default function KanbanApp() {
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 style={{ fontSize:17, fontWeight:700, marginBottom:16 }}>
-                {modal.mode==="add" ? "Nouveau projet" : form.title || "Modifier le projet"}
+                {modal.mode==="add" ? t.newCard : form.title || t.editCard}
               </h2>
               <div style={{ display:"flex", borderBottom:"1px solid #1E1E2A" }}>
-                {[["infos","Infos"],["notes","Notes"]].map(([key, label]) => (
+                {[["infos",t.tabInfos],["notes",t.tabNotes]].map(([key, label]) => (
                   <button key={key} onClick={() => setActiveTab(key)} style={{
                     flex:1, padding:"10px 0", border:"none", background:"transparent", cursor:"pointer",
                     fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:500,
@@ -509,27 +626,27 @@ export default function KanbanApp() {
               {activeTab==="infos" && (
                 <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                   <div>
-                    <label className="mlabel">Titre</label>
+                    <label className="mlabel">{t.fTitle}</label>
                     <input className="m-input" value={form.title}
                       onChange={e => setForm(f => ({...f, title:e.target.value}))}
-                      placeholder="Nom du projet…" autoFocus
+                      placeholder={t.fTitlePh} autoFocus
                       onKeyDown={e => e.key==="Enter" && saveCard()} />
                   </div>
                   <div>
-                    <label className="mlabel">Type</label>
+                    <label className="mlabel">{t.fType}</label>
                     <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
-                      {tags.map(t => (
-                        <div key={t} style={{ display:"flex", alignItems:"center" }}>
-                          <button onClick={() => setForm(f => ({...f, tag:t}))} style={{
+                      {tags.map(tag => (
+                        <div key={tag} style={{ display:"flex", alignItems:"center" }}>
+                          <button onClick={() => setForm(f => ({...f, tag}))} style={{
                             padding:"5px 11px", border:"1px solid",
-                            borderColor: form.tag===t ? "#E8C547" : "#2A2A38",
+                            borderColor: form.tag===tag ? "#E8C547" : "#2A2A38",
                             borderRadius:"100px 0 0 100px",
-                            background: form.tag===t ? "#E8C54722" : "transparent",
-                            color: form.tag===t ? "#E8C547" : "#7A7A90",
+                            background: form.tag===tag ? "#E8C54722" : "transparent",
+                            color: form.tag===tag ? "#E8C547" : "#7A7A90",
                             fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500,
                             cursor:"pointer", transition:"all 0.15s"
-                          }}>{t}</button>
-                          <button onClick={() => deleteTag(t)} style={{
+                          }}>{tag}</button>
+                          <button onClick={() => deleteTag(tag)} style={{
                             padding:"5px 7px", border:"1px solid #2A2A38", borderLeft:"none",
                             borderRadius:"0 100px 100px 0", background:"transparent", color:"#3A3A55",
                             fontFamily:"'Inter',sans-serif", fontSize:11, cursor:"pointer", lineHeight:1
@@ -544,16 +661,16 @@ export default function KanbanApp() {
                       <input className="m-input" value={newTagInput}
                         onChange={e => setNewTagInput(e.target.value)}
                         onKeyDown={e => e.key==="Enter" && addTag()}
-                        placeholder="Nouveau type…" style={{ flex:1 }} />
+                        placeholder={t.newTagPh} style={{ flex:1 }} />
                       <button onClick={addTag} style={{
                         background:"#1E1E2E", border:"1px solid #2A2A38", color:"#E8C547",
                         borderRadius:8, padding:"9px 14px", cursor:"pointer",
                         fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, whiteSpace:"nowrap"
-                      }}>+ Créer</button>
+                      }}>{t.createTag}</button>
                     </div>
                   </div>
                   <div>
-                    <label className="mlabel">Priorité</label>
+                    <label className="mlabel">{t.fPriority}</label>
                     <div style={{ display:"flex", gap:8 }}>
                       {PRIORITIES.map(p => (
                         <button key={p} onClick={() => setForm(f => ({...f, priority:p}))} style={{
@@ -564,12 +681,12 @@ export default function KanbanApp() {
                           color: form.priority===p ? PRIORITY_COLORS[p] : "#5A5A70",
                           fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500,
                           cursor:"pointer", transition:"all 0.15s"
-                        }}>{p}</button>
+                        }}>{t.prio[p] || p}</button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="mlabel">Échéance</label>
+                    <label className="mlabel">{t.fDeadline}</label>
                     <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                       <input type="date" className="m-input" value={form.deadline}
                         onChange={e => setForm(f => ({...f, deadline:e.target.value}))}
@@ -579,12 +696,12 @@ export default function KanbanApp() {
                           background:"none", border:"1px solid #2A2A38", color:"#5A5A70",
                           borderRadius:8, padding:"8px 12px", cursor:"pointer",
                           fontFamily:"'Inter',sans-serif", fontSize:12, whiteSpace:"nowrap"
-                        }}>Effacer</button>
+                        }}>{t.clear}</button>
                       )}
                     </div>
                   </div>
                   <div>
-                    <label className="mlabel">Couleur</label>
+                    <label className="mlabel">{t.fColor}</label>
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                       {CARD_COLORS.map(c => (
                         <button key={c} onClick={() => setForm(f => ({...f, color:c}))} style={{
@@ -599,15 +716,15 @@ export default function KanbanApp() {
               )}
               {activeTab==="notes" && (
                 <div>
-                  <label className="mlabel" style={{ marginBottom:10 }}>Notes libres</label>
+                  <label className="mlabel" style={{ marginBottom:10 }}>{t.freeNotes}</label>
                   <textarea className="notes-textarea"
                     value={form.notes}
                     onChange={e => setForm(f => ({...f, notes:e.target.value}))}
-                    placeholder="Idées, contacts, liens, prochaines étapes…"
+                    placeholder={t.notesPh}
                     autoFocus
                   />
                   <p style={{ fontSize:11, color:"#3A3A55", marginTop:8 }}>
-                    Point bleu • sur la carte = notes présentes
+                    {t.notesHint}
                   </p>
                 </div>
               )}
@@ -618,16 +735,16 @@ export default function KanbanApp() {
                   background:"none", border:"1px solid #3A1A22", color:"#E84770",
                   borderRadius:8, padding:"8px 14px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, cursor:"pointer"
-                }}>Supprimer</button>
+                }}>{t.delete}</button>
               ) : <div />}
               <div style={{ display:"flex", gap:10 }}>
                 <button onClick={closeModal} style={{
                   background:"none", border:"1px solid #2A2A38", color:"#5A5A70",
                   borderRadius:8, padding:"8px 14px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, cursor:"pointer"
-                }}>Annuler</button>
+                }}>{t.cancel}</button>
                 <button className="save-btn" onClick={saveCard}>
-                  {modal.mode==="add" ? "Ajouter" : "Sauvegarder"}
+                  {modal.mode==="add" ? t.add : t.save}
                 </button>
               </div>
             </div>
@@ -640,19 +757,19 @@ export default function KanbanApp() {
         <div className="modal-overlay" onClick={() => setColModal(null)}>
           <div className="modal-box" style={{ width:340 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ paddingBottom:0 }}>
-              <h2 style={{ fontSize:17, fontWeight:700, marginBottom:20 }}>Nouvelle colonne</h2>
+              <h2 style={{ fontSize:17, fontWeight:700, marginBottom:20 }}>{t.newCol}</h2>
             </div>
             <div className="modal-body" style={{ paddingTop:4 }}>
               <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                 <div>
-                  <label className="mlabel">Nom</label>
+                  <label className="mlabel">{t.colName}</label>
                   <input className="m-input" value={colForm.title}
                     onChange={e => setColForm(f => ({...f, title:e.target.value}))}
-                    placeholder="Ex: En attente, Archivé…" autoFocus
+                    placeholder={t.colNamePh} autoFocus
                     onKeyDown={e => e.key==="Enter" && saveColumn()} />
                 </div>
                 <div>
-                  <label className="mlabel">Couleur</label>
+                  <label className="mlabel">{t.fColor}</label>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                     {COL_COLORS.map(c => (
                       <button key={c} onClick={() => setColForm(f => ({...f, color:c}))} style={{
@@ -672,8 +789,8 @@ export default function KanbanApp() {
                   background:"none", border:"1px solid #2A2A38", color:"#5A5A70",
                   borderRadius:8, padding:"8px 14px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, cursor:"pointer"
-                }}>Annuler</button>
-                <button className="save-btn" onClick={saveColumn}>Créer</button>
+                }}>{t.cancel}</button>
+                <button className="save-btn" onClick={saveColumn}>{t.create}</button>
               </div>
             </div>
           </div>
@@ -685,11 +802,11 @@ export default function KanbanApp() {
         <div className="modal-overlay" onClick={() => setConfirmDeleteCol(null)}>
           <div className="modal-box" style={{ width:340 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 style={{ fontSize:16, fontWeight:700, marginBottom:12 }}>Supprimer la colonne ?</h2>
+              <h2 style={{ fontSize:16, fontWeight:700, marginBottom:12 }}>{t.delColQ}</h2>
             </div>
             <div className="modal-body">
               <p style={{ fontSize:13, color:"#94A3B8", lineHeight:1.6 }}>
-                Tous les projets dans cette colonne seront supprimés. Cette action est irréversible.
+                {t.delColBody}
               </p>
             </div>
             <div className="modal-footer">
@@ -699,12 +816,12 @@ export default function KanbanApp() {
                   background:"none", border:"1px solid #2A2A38", color:"#5A5A70",
                   borderRadius:8, padding:"8px 14px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, cursor:"pointer"
-                }}>Annuler</button>
+                }}>{t.cancel}</button>
                 <button onClick={() => deleteCol(confirmDeleteCol)} style={{
                   background:"#E84770", color:"white", border:"none",
                   borderRadius:8, padding:"8px 16px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, cursor:"pointer"
-                }}>Supprimer</button>
+                }}>{t.delete}</button>
               </div>
             </div>
           </div>
@@ -716,11 +833,11 @@ export default function KanbanApp() {
         <div className="modal-overlay" onClick={() => setConfirmDeleteCard(null)}>
           <div className="modal-box" style={{ width:340 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 style={{ fontSize:16, fontWeight:700, marginBottom:12 }}>Supprimer ce projet ?</h2>
+              <h2 style={{ fontSize:16, fontWeight:700, marginBottom:12 }}>{t.delCardQ}</h2>
             </div>
             <div className="modal-body">
               <p style={{ fontSize:13, color:"#94A3B8", lineHeight:1.6 }}>
-                « {confirmDeleteCard.title} » et ses notes seront supprimés définitivement.
+                {t.delCardBody(confirmDeleteCard.title)}
               </p>
             </div>
             <div className="modal-footer">
@@ -730,12 +847,12 @@ export default function KanbanApp() {
                   background:"none", border:"1px solid #2A2A38", color:"#5A5A70",
                   borderRadius:8, padding:"8px 14px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, cursor:"pointer"
-                }}>Annuler</button>
+                }}>{t.cancel}</button>
                 <button onClick={() => { deleteCard(confirmDeleteCard.cardId, confirmDeleteCard.colId); setConfirmDeleteCard(null); }} style={{
                   background:"#E84770", color:"white", border:"none",
                   borderRadius:8, padding:"8px 16px",
                   fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, cursor:"pointer"
-                }}>Supprimer</button>
+                }}>{t.delete}</button>
               </div>
             </div>
           </div>
@@ -745,7 +862,7 @@ export default function KanbanApp() {
       {/* Toast sauvegarde auto */}
       {autoBackupToast && (
         <div className="error-toast" style={{ borderColor:"#47E87B", color:"#47E87B", background:"#0F2A18" }}>
-          Sauvegarde auto téléchargée, garde ce fichier au chaud
+          {t.autoBackup}
         </div>
       )}
 
