@@ -1,0 +1,15 @@
+{
+  "name": "single-file-kanban",
+  "version": "1.0.0",
+  "description": "A personal kanban board in one HTML file. No account, no server, no network requests.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/entry.jsx --bundle --minify --jsx=automatic --define:process.env.NODE_ENV='\"production\"' --outfile=bundle.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
